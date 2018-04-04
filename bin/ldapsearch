@@ -6,6 +6,10 @@
 # $Id: ldapsearch,v 1.2 2004/01/20 07:07:38 chrisridd Exp $
 #
 # $Log: ldapsearch,v $
+# 
+# Revision 1.4  2018/04/04 20:19:00  ongtiongheng\@gmail.com
+# added Start-TLS and tune the TCP parameters to timeout fast, e.g within 5 seconds
+#
 # Revision 1.2  2004/01/20 07:07:38  chrisridd
 # Fixes from Peter Marschall
 #
@@ -45,7 +49,6 @@ my @textsyntax = grep /^\w/, (<<'EOS' =~ /(#.*|\S+)/g); # qw() with comments
 		    # RFC 2251
 		    modifiersName modifyTimestamp
 		    creatorsName createTimestamp
-
 		    # RFC 2256
 		    objectClass aliasedObjectName knowledgeInformation cn sn
 		    serialNumber c l st street o ou title description
@@ -60,10 +63,8 @@ my @textsyntax = grep /^\w/, (<<'EOS' =~ /(#.*|\S+)/g); # qw() with comments
 		    initials generationQualifier x500UniqueIdentifier
 		    dnQualifier enhancedSearchGuide protocolInformation
 		    distinguishedName uniqueMember houseIdentifier dmdName
-
 		    # RFC 1274
 		    mail rfc822Mailbox
-
 		    # RFC 2079
 		    labeledURI
 		    
@@ -150,6 +151,7 @@ while (@urls) {
     my %openargs;
     my %bindargs;
     my %searchargs;
+    my $mesg;
 
     $bindargs{dn} = $exts{bindname} if $exts{bindname};
     $bindargs{password} = $exts{bindpassword} if $exts{bindpassword};
@@ -160,8 +162,14 @@ while (@urls) {
     dumpargs("new", $url->host, \%openargs) if ($opt_n || $opt_v);
 
     unless ($opt_n) {
-	$ldap = new Net::LDAP($url->host,
+	$ldap = new Net::LDAP($url->host,timeout => '4',async => '1', keepalive => '1',
 			      %openargs) or die $@;
+	$mesg = $ldap->start_tls(
+    		sslversion => 'tlsv1',
+    		verify => 'none',
+    		capath => '/etc/ssl/certs/',
+    		);
+		die $mesg->error if $mesg->is_error;
     }
 
 #
